@@ -15,7 +15,7 @@ from urllib.parse import unquote
 
 from PIL import Image
 
-from core import config, dynamic, generate, scheduler, win32
+from core import assets_gen, config, dynamic, generate, scheduler, win32
 
 BASE = Path(__file__).resolve().parent
 STATIC_DIR = BASE / "static"
@@ -44,6 +44,8 @@ def ensure_dirs():
     if not LIBRARY_FILE.exists():
         LIBRARY_FILE.write_text("[]", encoding="utf-8")
     generate.ensure_dirs()
+    # 幂等补全内置素材库（纹理/光斑/渐变卡/剪贴元素），缺失才生成
+    assets_gen.ensure_builtin_assets()
 
 
 def load_library():
@@ -356,10 +358,20 @@ class Handler(SimpleHTTPRequestHandler):
             return
 
         if path == "/api/dynamic/start":
-            if engine._thread is None or not engine._thread.is_alive():
+            if engine.browser_fallback:
                 self._send_json({"ok": False,
-                                 "error": "内置窗口引擎未运行（当前为浏览器模式回退），动态壁纸不可用"})
+                                 "error": "当前为浏览器模式回退，动态壁纸不可用，"
+                                          "请安装 WebView2 Runtime 后重启应用"})
                 return
+            # 等待内置窗口引擎就绪（webview 启动初期 _thread 尚未创建）
+            deadline = time.time() + 15
+            while (engine._thread is None or not engine._thread.is_alive()):
+                if time.time() > deadline:
+                    self._send_json({"ok": False,
+                                     "error": "动态壁纸引擎未就绪：" +
+                                              (engine.message or "未检测到 WebView2，可能处于浏览器回退模式")})
+                    return
+                time.sleep(0.5)
             data = self._read_json() or {}
             if data.get("click_through") is not None:
                 config.set("dynamic.click_through", bool(data["click_through"]))

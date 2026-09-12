@@ -46,6 +46,7 @@ def main():
         print("已回退为系统浏览器打开：%s" % url)
         print("提示：动态壁纸依赖内置窗口引擎（WebView2），浏览器模式下动态壁纸不可用，"
               "请检查 WebView2 Runtime 后重试。")
+        engine.browser_fallback = True
         webbrowser.open(url)
         try:
             httpd.serve_forever()

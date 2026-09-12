@@ -199,9 +199,18 @@
     });
   }
 
-  function loadAssets() {
+  function loadAssets(attempt) {
+    attempt = attempt || 0;
     api("/api/assets").then(function (data) {
       assets = data.assets || [];
+      if (!assets.length && attempt < 10) {
+        // 内置素材仍在后台生成，稍后自动刷新
+        $("#imgEmpty").hidden = false;
+        $("#imgEmpty").textContent = "素材库生成中，稍后自动刷新…";
+        setTimeout(function () { loadAssets(attempt + 1); }, 3000);
+        return;
+      }
+      $("#imgEmpty").textContent = "还没有图片素材<br>点击上方「加入图片」导入本地图片";
       renderImgGrid();
       renderBgPick();
     }).catch(function () {
@@ -214,7 +223,9 @@
   function renderImgGrid() {
     var grid = $("#imgGrid");
     $("#imgEmpty").hidden = assets.length > 0;
-    grid.innerHTML = assets.map(function (it) {
+    grid.innerHTML = assets.slice().sort(function (a, b) {
+      return (a.cat || "").localeCompare(b.cat || "");
+    }).map(function (it) {
       return (
         '<div class="img-card" data-id="' + it.id + '" title="' + it.name + '">' +
         '<div class="thumb"><img src="/api/thumb/' + it.id + '" alt=""></div>' +
@@ -967,7 +978,11 @@
     var btn = $("#dynApplyBtn");
     api("/api/dynamic/status").then(function (st) {
       if (st && st.status === "error") {
-        toast("动态壁纸引擎异常：" + (st.message || "未知错误"));
+        toast("动态壁纸引擎异常：" + (st.last_error || st.message || "未知错误"));
+        return;
+      }
+      if (st && st.browser_fallback) {
+        toast("当前为浏览器模式，动态壁纸不可用，请安装 WebView2 Runtime 后重启应用");
         return;
       }
       btn.disabled = true;

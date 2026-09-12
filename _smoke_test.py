@@ -44,6 +44,12 @@ st, d = req("GET", "/api/wallpaper/library")
 check("library 25 builtin", st == 200 and len(d["items"]) >= 25, "count=%d" % len(d.get("items", [])))
 lib_file = d["items"][0]["file"] if d.get("items") else "builtin/01-xxx.png"
 
+# 2.1 重新生成 25 张内置壁纸耗时（首启提速验证，阈值 60s）
+t0 = time.time()
+st, d = req("POST", "/api/wallpaper/generate", {})
+dt = time.time() - t0
+check("regen 25 builtin < 60s", st == 200 and dt < 60, "%.1fs" % dt)
+
 # 3. 中文名缩略图（URL 编码）
 import urllib.parse
 thumb_url = "/api/wallpaper/thumb/" + urllib.parse.quote(lib_file, safe="/")
@@ -96,6 +102,40 @@ check("wallpaper.js served", "switchPage" in js, "%d bytes" % len(js))
 with urllib.request.urlopen(BASE + "/dyn/waves", timeout=10) as resp:
     wv = resp.read().decode("utf-8")
 check("dyn waves served", "__wmSetPaused" in wv)
+
+# 12. 内置素材库（ensure_dirs 已幂等生成 30 张）
+st, d = req("GET", "/api/assets")
+builtins = [a for a in d.get("assets", []) if a.get("source") == "builtin"]
+check("assets 30 builtin", st == 200 and len(builtins) >= 30, "count=%d" % len(builtins))
+
+# 13. 内置素材缩略图/原图（PNG）可访问
+thumb_ok = img_ok = 0
+for a in builtins[:3]:
+    with urllib.request.urlopen(BASE + "/api/thumb/" + a["id"], timeout=30) as resp:
+        if len(resp.read()) > 100:
+            thumb_ok += 1
+    with urllib.request.urlopen(BASE + "/api/image/" + a["id"], timeout=30) as resp:
+        if resp.read()[:8] == b"\x89PNG\r\n\x1a\n":
+            img_ok += 1
+check("builtin thumbs serve", thumb_ok == 3, "%d/3" % thumb_ok)
+check("builtin images png", img_ok == 3, "%d/3" % img_ok)
+
+# 14. 动态 composition 保存/读取往返
+comp = {"baseW": 1920, "baseH": 1080,
+        "bg": {"type": "solid", "color": "#112233"},
+        "elements": [{"id": "t1", "kind": "text", "text": "冒烟", "cx": 100, "cy": 100,
+                      "w": 10, "h": 10, "rot": 0, "opacity": 1, "font": "Arial",
+                      "fontSize": 48, "color": "#ffffff", "align": "left"}]}
+st, d = req("POST", "/api/dynamic/composition", {"comp": comp})
+check("composition save", st == 200 and d["ok"])
+st, d = req("GET", "/api/dynamic/composition")
+check("composition readback", st == 200 and d.get("comp") == comp)
+
+# 15. custom 模板可访问且引用渲染核心
+with urllib.request.urlopen(BASE + "/dyn/custom", timeout=10) as resp:
+    custom_html = resp.read().decode("utf-8")
+check("dyn custom served", "editor-render.js" in custom_html
+      and "/api/dynamic/composition" in custom_html, "%d bytes" % len(custom_html))
 
 print("\n==== %d failures ====" % len(FAIL))
 for f in FAIL:

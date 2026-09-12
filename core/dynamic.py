@@ -26,6 +26,7 @@ class DynamicEngine:
         self._thread = None
         self._watch = None
         self._lock = threading.Lock()
+        self.browser_fallback = False  # webview 启动失败、回退浏览器模式时置 True
 
     # ---------- 外部命令入口（任意线程调用） ----------
     def request(self, cmd, **kw):
