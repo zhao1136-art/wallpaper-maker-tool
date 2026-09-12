@@ -30,6 +30,9 @@ DEFAULTS = {
         "fullscreen_pause": True,   # 全屏应用时暂停
         "battery_pause": True,      # 电池供电时暂停
     },
+    "export": {
+        "dir": None,                # 自定义导出目录；None = 使用默认 assets/exports
+    },
 }
 
 _lock = threading.Lock()

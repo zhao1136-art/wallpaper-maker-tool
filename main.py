@@ -8,8 +8,19 @@ import os
 import sys
 import threading
 import webbrowser
+from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+# PyInstaller 窗口模式（无控制台）下 sys.stdout/stderr 为 None，
+# print() 会抛异常，统一重定向到 exe 同级 app.log 便于排障。
+if getattr(sys, "frozen", False) and (sys.stdout is None or sys.stderr is None):
+    _log_path = Path(sys.executable).resolve().parent / "app.log"
+    _log_fh = open(_log_path, "a", encoding="utf-8", buffering=1)
+    if sys.stdout is None:
+        sys.stdout = _log_fh
+    if sys.stderr is None:
+        sys.stderr = _log_fh
 
 import server as srv
 from core import assets_gen, generate, scheduler

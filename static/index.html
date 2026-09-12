@@ -56,6 +56,7 @@
 
     <div class="tb-group tb-right">
       <button id="dynApplyBtn" class="tb-btn" title="把当前画布作为动态壁纸应用到桌面">▶ 应用为动态壁纸</button>
+      <button id="exportPathBtn" class="tb-btn" title="设置导出位置（默认：assets/exports）">📁</button>
       <button id="exportPngBtn" class="tb-btn primary">导出 PNG</button>
       <button id="exportJpgBtn" class="tb-btn">导出 JPG</button>
     </div>
@@ -212,9 +213,11 @@
       </section>
 
       <section class="rp-section grow">
-        <h3>图层 <span id="layerCount" class="count"></span></h3>
+        <h3>图层 <span id="layerCount" class="count"></span>
+          <button id="layerAddBtn" class="mini" title="新建图层（Ctrl+Shift+N）">＋</button>
+        </h3>
         <div id="layerList" class="layer-list"></div>
-        <div id="layerEmpty" class="empty-tip" hidden>画布还是空的<br>点击左侧的 Emoji 或图片开始创作</div>
+        <div id="layerEmpty" class="empty-tip" hidden>还没有图层<br>点击「＋」新建，或从左侧加入元素</div>
       </section>
     </aside>
   </main>
@@ -350,6 +353,35 @@
     <input type="file" id="searchFile" accept="image/*" hidden>
     <div id="searchBusy" class="empty-tip" hidden>检索中…</div>
     <div id="searchResults" class="search-results"></div>
+  </div>
+</div>
+
+<!-- ==================== 导出位置设置弹窗 ==================== -->
+<div id="pathModal" class="modal" hidden>
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3>📁 导出位置设置</h3>
+      <button id="pathClose" class="modal-x">✕</button>
+    </div>
+    <p class="hint">导出的 PNG/JPG 将保存到你指定的文件夹；未设置时使用默认导出目录。</p>
+    <div class="path-opt">
+      <label class="check"><input type="radio" name="pathMode" value="default" checked> 使用默认位置</label>
+      <label class="check"><input type="radio" name="pathMode" value="custom"> 自定义位置</label>
+    </div>
+    <div id="pathCustom" hidden>
+      <div class="path-row">
+        <input id="pathInput" type="text" spellcheck="false"
+               placeholder="例如 D:\壁纸导出 或 %USERPROFILE%\Pictures\壁纸" autocomplete="off">
+        <button id="pathBrowseBtn" class="btn">浏览…</button>
+      </div>
+      <label class="check"><input type="checkbox" id="pathAutoCreate" checked> 目录不存在时自动创建</label>
+    </div>
+    <div id="pathStatus" class="path-status"></div>
+    <div id="pathError" class="path-error" hidden></div>
+    <div class="path-actions">
+      <button id="pathSaveBtn" class="btn primary">保存</button>
+      <button id="pathCancelBtn" class="btn">取消</button>
+    </div>
   </div>
 </div>
 

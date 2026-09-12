@@ -87,8 +87,17 @@ canvas{display:block}
       ctx.fillRect(0, 0, cv.width, cv.height);
       return;
     }
+    // 隐藏图层过滤：仅当组合带 layers 字段时生效（向后兼容旧组合）
+    var hideLayers = null;
+    if (comp.layers) {
+      hideLayers = {};
+      comp.layers.forEach(function (l) {
+        if (l.visible === false) hideLayers[l.id] = true;
+      });
+    }
     window.wm.wmPaintBackground(ctx, comp.bg, W, H);
     (comp.elements || []).forEach(function (el) {
+      if (hideLayers && el.layer && hideLayers[el.layer]) return;
       window.wm.wmDrawElement(ctx, el, paused ? null : animFor(el, time));
     });
   }

@@ -19,7 +19,16 @@ dyn_debug*.log
 # 本地素材（示例/分享壁纸）
 *.jpg
 
+# 打包产物
+build/
+dist/
+
 # 编辑器/系统
 .vscode/
 .idea/
 *.swp
+
+# 本机工程/调试产物
+.trae/
+_smoke_test.py
+*.log

@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>壁纸工坊 · 完整版升级计划</title>
+<style>
+  :root{--bg:#101216;--panel:#1a1d24;--line:#2c313c;--text:#e8eaee;--muted:#9aa0ab;--accent:#5b8cff;--accent2:#7c6cff;--ok:#3fbf7f;--warn:#ffb454;--danger:#ff5c5c}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:"Segoe UI","Microsoft YaHei",system-ui,sans-serif;line-height:1.75;font-size:14px}
+  .wrap{max-width:960px;margin:0 auto;padding:40px 28px 80px}
+  h1{font-size:26px;margin-bottom:6px}
+  .sub{color:var(--muted);margin-bottom:28px}
+  h2{font-size:18px;margin:34px 0 12px;padding-left:10px;border-left:4px solid var(--accent)}
+  h3{font-size:15px;margin:20px 0 8px;color:var(--accent)}
+  p{margin-bottom:10px;color:#c6cad2}
+  code{background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:1px 6px;font-size:13px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 18px;margin:12px 0}
+  table{width:100%;border-collapse:collapse;margin:12px 0;font-size:13px}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--muted);font-weight:600}
+  .tag{display:inline-block;padding:1px 10px;border-radius:12px;font-size:12px;background:rgba(91,140,255,.15);color:var(--accent);margin-right:6px}
+  .tag.g{background:rgba(63,191,127,.15);color:var(--ok)}
+  .tag.o{background:rgba(255,180,84,.15);color:var(--warn)}
+  .tag.r{background:rgba(255,92,92,.15);color:var(--danger)}
+  ul{margin:6px 0 12px 22px;color:#c6cad2}
+  li{margin-bottom:4px}
+  .phase{display:flex;gap:10px;margin:10px 0}
+  .phase .n{flex:0 0 30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff}
+  .phase .b{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 14px}
+  .note{font-size:12px;color:var(--muted);border-left:2px solid var(--warn);padding:4px 10px;margin:10px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>壁纸工坊 · 完整壁纸软件升级计划</h1>
+  <div class="sub">对标「哲风壁纸」PC 端核心能力 · 2026-09-11 · 基于现有画布编辑器增量开发</div>
+
+  <h2>一、目标与差异对照</h2>
+  <div class="card">
+  <table>
+    <tr><th>哲风壁纸功能</th><th>本工具实现方案</th><th>阶段</th></tr>
+    <tr><td>一键设置静态壁纸</td><td>Windows SystemParametersInfo + 注册表，支持填充/适应/拉伸/居中/跨屏</td><td><span class="tag">一</span></td></tr>
+    <tr><td>锁屏静态壁纸</td><td>管理员写入 LockScreenImage 策略注册表（尽力而为，失败给出指引）</td><td><span class="tag">一</span></td></tr>
+    <tr><td>壁纸中心（与网页互通）</td><td>内置壁纸库：程序化生成精选壁纸 + 本地文件夹导入 + 预览/设为壁纸</td><td><span class="tag">一</span></td></tr>
+    <tr><td>定时切换</td><td>后台调度线程，间隔/顺序/随机轮换，配置持久化</td><td><span class="tag">一</span></td></tr>
+    <tr><td>多显示器布局</td><td>静态：所有屏相同 / 单图跨屏拼接；动态：每屏独立窗口</td><td><span class="tag">一/二</span></td></tr>
+    <tr><td>动态壁纸 + 淡入淡出</td><td>WorkerW 桌面后台窗口渲染 HTML/Canvas 动画（极光/星空/粒子/波浪/时钟）</td><td><span class="tag">二</span></td></tr>
+    <tr><td>节能模式</td><td>全屏前台应用检测 + 笔记本电池检测，自动暂停/恢复渲染</td><td><span class="tag">二</span></td></tr>
+    <tr><td>壁纸编辑器（图层/粒子/动效/拖尾）</td><td>现有 Canvas 编辑器扩展：元素动效、粒子、鼠标拖尾、导出动态壁纸包</td><td><span class="tag">三</span></td></tr>
+    <tr><td>按图检索</td><td>本地以图搜图：感知哈希（dHash）+ 汉明距离，对本地库检索相似壁纸</td><td><span class="tag">三</span></td></tr>
+  </table>
+  <div class="note">说明：付费/账号/云端同步等商业能力不复制；「按图检索」用本地感知哈希实现（无需联网与 Key）。</div>
+  </div>
+
+  <h2>二、总体架构</h2>
+  <div class="card">
+    <p>沿用四层架构：<code>pywebview 外壳</code>（主窗口 + 动态壁纸窗口）→ <code>前端界面</code>（编辑器 / 壁纸中心 / 设置 三页签）→ <code>本地服务</code>（HTTP + 系统控制）→ <code>本地存储</code>（配置 / 壁纸库）。</p>
+    <p>新增模块：</p>
+    <ul>
+      <li><code>core/win32.py</code> — ctypes 封装系统 API：设壁纸、锁屏、显示器枚举、全屏检测、电池检测、WorkerW 查找</li>
+      <li><code>core/config.py</code> — 全局配置 JSON（定时切换、节能、动态壁纸状态）</li>
+      <li><code>core/scheduler.py</code> — 定时切换线程</li>
+      <li><code>core/generate.py</code> — Pillow 程序化生成精选壁纸 + dHash 以图搜图</li>
+      <li><code>core/dynamic.py</code> — 动态壁纸引擎：每显示器一个透明无边框窗口，重定向进 WorkerW，支持点击穿透/交互模式切换</li>
+      <li><code>wallpapers/</code> — 壁纸库目录（user 用户导入 / builtin 内置生成 / dyn 动态模板 HTML）</li>
+    </ul>
+  </div>
+
+  <h2>三、分期交付</h2>
+
+  <div class="phase"><div class="n">1</div><div class="b">
+    <h3>系统壁纸能力（本期先交付）</h3>
+    <p>静态壁纸一键设置（4 种显示模式 + 跨屏拼接）、锁屏壁纸、定时切换（间隔/顺序/随机）、壁纸中心（内置精选 30 张生成壁纸 + 文件夹导入 + 网格预览 + 快捷操作）、设置页（节能开关、定时规则）。</p>
+  </div></div>
+
+  <div class="phase"><div class="n">2</div><div class="b">
+    <h3>动态壁纸引擎</h3>
+    <p>WorkerW 后台渲染窗口（每屏独立）、内置动态模板（极光/星空/粒子/波浪/时钟/雨滴）、点击穿透与交互模式、节能模式（全屏应用 / 电池触发暂停）、动态壁纸定时切换。</p>
+  </div></div>
+
+  <div class="phase"><div class="n">3</div><div class="b">
+    <h3>编辑器动效 + 按图检索</h3>
+    <p>编辑器新增元素动效（浮动/旋转/脉冲）、粒子系统、鼠标拖尾、点击事件，导出动态壁纸包（HTML）并由引擎播放；本地 dHash 以图搜图。</p>
+  </div></div>
+
+  <h2>四、关键风险与对策</h2>
+  <div class="card">
+    <table>
+      <tr><th>风险</th><th>对策</th></tr>
+      <tr><td>WorkerW 重定向导致 pywebview 窗口渲染异常</td><td>先验证最小窗口重定向；异常时回退为「置底 + 点击穿透」窗口（图标层之上）并给出提示</td></tr>
+      <tr><td>锁屏壁纸注册表需要管理员权限</td><td>尝试写入，失败返回可读错误 + 管理员运行指引</td></tr>
+      <tr><td>动态壁纸常驻 CPU 占用</td><td>节能模式默认开启；动画帧率上限 30fps；模板提供低功耗档位</td></tr>
+      <tr><td>跨屏拼接在不同缩放比显示器失真</td><td>按虚拟桌面逻辑坐标拼接，DDI 缩放交给系统</td></tr>
+    </table>
+  </div>
+
+  <h2>五、验收标准</h2>
+  <ul>
+    <li>任意 PNG/JPG 可一键设为系统桌面壁纸并即时生效，4 种显示模式正确</li>
+    <li>锁屏设置成功或给出明确指引</li>
+    <li>定时切换按配置自动轮换，重启后配置保留</li>
+    <li>动态壁纸在桌面后台流畅播放，全屏游戏/拔电后自动暂停，恢复后自动继续</li>
+    <li>编辑器可导出含动效的动态壁纸包并被引擎播放</li>
+  </ul>
+</div>
+</body>
+</html>

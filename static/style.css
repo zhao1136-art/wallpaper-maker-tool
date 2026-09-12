@@ -130,6 +130,10 @@ input[type="color"] {
   background: linear-gradient(135deg, var(--accent), var(--accent-2));
   border-color: transparent; color: #fff; font-weight: 600;
 }
+.tb-btn.has-path {
+  border-color: var(--accent); color: var(--text);
+  max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 .tb-zoom { min-width: 44px; text-align: center; color: var(--muted); font-variant-numeric: tabular-nums; }
 
 #canvasSize, #bgType {
@@ -318,25 +322,37 @@ input[type="color"] {
 
 .layer-list { display: flex; flex-direction: column; gap: 4px; }
 .layer-item {
-  display: flex; align-items: center; gap: 8px;
+  display: flex; align-items: center; gap: 6px;
   padding: 6px 8px; border-radius: 6px;
   border: 1px solid transparent; cursor: pointer;
   background: var(--panel-2);
 }
 .layer-item:hover { border-color: var(--border); }
 .layer-item.active { border-color: var(--accent); background: rgba(91,140,255,.1); }
-.layer-item .thumb {
-  width: 26px; height: 26px; flex: 0 0 26px;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 18px; border-radius: 4px; overflow: hidden;
-  background: #1b1d22;
+.layer-item.hidden { opacity: .75; }
+.layer-item.hidden .name { color: var(--muted); text-decoration: line-through; }
+.layer-item.locked { border-left: 3px solid var(--warn); }
+.layer-item .vis {
+  width: 22px; height: 22px; flex: 0 0 22px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 4px; font-size: 12px; color: var(--text);
 }
-.layer-item .thumb img { max-width: 100%; max-height: 100%; object-fit: contain; }
-.layer-item .thumb .lay-ico.t { font-size: 13px; font-weight: 700; color: var(--accent); }
-.layer-item .thumb .lay-ico.b { width: 12px; height: 12px; border-radius: 50%; border: 1px solid rgba(255,255,255,.35); }
+.layer-item.hidden .vis { color: var(--muted); }
+.layer-item .vis:hover { background: var(--panel); }
 .layer-item .name {
   flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   font-size: 12px; color: var(--text);
+}
+.layer-item .cnt {
+  flex: 0 0 auto; min-width: 20px; text-align: center;
+  font-size: 10px; color: var(--muted);
+  background: rgba(255,255,255,.06); border-radius: 8px; padding: 1px 5px;
+  font-variant-numeric: tabular-nums;
+}
+.layer-item input.rename {
+  flex: 1; min-width: 0; padding: 2px 5px;
+  background: var(--panel); border: 1px solid var(--accent);
+  border-radius: 4px; color: var(--text); font-size: 12px; outline: none;
 }
 .layer-item .ops { display: flex; gap: 2px; }
 .layer-item .ops button {
@@ -347,6 +363,15 @@ input[type="color"] {
 .layer-item .ops button.del:hover, .layer-item .ops button.del.armed {
   color: var(--danger); border-color: var(--danger);
 }
+.rp-section h3 .mini {
+  float: right; width: 22px; height: 22px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border); border-radius: 5px;
+  color: var(--muted); font-size: 14px; line-height: 1;
+  text-transform: none; letter-spacing: 0;
+  vertical-align: middle; margin-top: -2px;
+}
+.rp-section h3 .mini:hover { color: var(--text); border-color: var(--accent); }
 
 .empty-tip {
   padding: 22px 10px; text-align: center; color: var(--muted);
@@ -495,6 +520,27 @@ input[type="color"] {
   transition: border-color .12s, color .12s;
 }
 .drop:hover, .drop.drag { border-color: var(--accent); color: var(--text); }
+
+/* ==================== 导出位置设置 ==================== */
+.path-opt { display: flex; gap: 18px; margin: 10px 0 6px; }
+.path-opt .check { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; font-size: 13px; }
+.path-row { display: flex; gap: 8px; margin: 8px 0 6px; }
+.path-row input {
+  flex: 1; min-width: 0; height: 32px; padding: 0 10px;
+  background: var(--panel-2); border: 1px solid var(--border);
+  border-radius: 6px; color: var(--text); font-size: 12px;
+  font-family: Consolas, "Microsoft YaHei", monospace;
+}
+.path-row input:focus { border-color: var(--accent); outline: none; }
+.path-status { margin-top: 10px; font-size: 12px; color: var(--accent); min-height: 16px; }
+.path-error {
+  margin-top: 8px; padding: 8px 10px;
+  background: rgba(229,72,77,.12); border: 1px solid var(--danger);
+  border-radius: 6px; color: #ff8a8d; font-size: 12px; line-height: 1.6;
+}
+.path-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+#pathAutoCreate { vertical-align: -2px; margin-right: 4px; }
+.path-opt .check input, .path-row .check input { accent-color: var(--accent); }
 .search-results {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   gap: 10px; margin-top: 14px;

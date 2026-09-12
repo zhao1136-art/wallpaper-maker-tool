@@ -26,7 +26,10 @@
     history: [],
     historyIdx: -1,
     tool: "select",   // select / text / brush
-    brushCfg: { type: "pencil", size: 12, color: "#ff5e62", opacity: 0.8 }
+    brushCfg: { type: "pencil", size: 12, color: "#ff5e62", opacity: 0.8 },
+    // 图层：数组序 = 图层 z 序（后=上）；元素通过 el.layer 指向图层 id
+    layers: [],
+    activeLayerId: null
   };
 
   var HISTORY_LIMIT = 60;
@@ -43,6 +46,101 @@
   // ==================== 工具函数 ====================
   function uid() { return "el" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
 
+  function lid() { return "layer" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+
+  // ---------- 图层 helper ----------
+  function layerById(id) {
+    return state.layers.find(function (l) { return l.id === id; }) || state.layers[0] || null;
+  }
+
+  function layerIndex(id) {
+    for (var i = 0; i < state.layers.length; i++) {
+      if (state.layers[i].id === id) return i;
+    }
+    return -1;
+  }
+
+  function activeLayer() {
+    return layerById(state.activeLayerId);
+  }
+
+  function cloneLayers(list) {
+    return (list || state.layers).map(function (l) { return Object.assign({}, l); });
+  }
+
+  // 定位某图层在 elements 中连续块半开区间 [start, end)，未找到则 start=-1
+  function layerRange(id) {
+    var start = -1, end = -1;
+    for (var i = 0; i < state.elements.length; i++) {
+      if (state.elements[i].layer === id) {
+        if (start === -1) start = i;
+        end = i + 1;
+      } else if (start !== -1) {
+        break;
+      }
+    }
+    return [start, end];
+  }
+
+  function elementsOfLayer(id) {
+    var r = layerRange(id);
+    return r[0] === -1 ? [] : state.elements.slice(r[0], r[1]);
+  }
+
+  function visibleElements() {
+    return state.elements.filter(function (el) {
+      var l = layerById(el.layer);
+      return !l || l.visible !== false;
+    });
+  }
+
+  // 新建元素进入活动图层：插入该层块末尾，保持"按层分组"不变量
+  function addElementToLayer(el) {
+    el.layer = activeLayer().id;
+    var r = layerRange(el.layer);
+    var at;
+    if (r[0] !== -1) {
+      at = r[1]; // 已有块：插入块末尾
+    } else {
+      // 空图层：插入到其下方所有非空图层元素之后
+      at = 0;
+      var idx = layerIndex(el.layer);
+      for (var i = 0; i < idx; i++) {
+        var br = layerRange(state.layers[i].id);
+        if (br[0] !== -1) at = Math.max(at, br[1]);
+      }
+    }
+    state.elements.splice(at, 0, el);
+  }
+
+  // 图层被锁定则禁止编辑/选择/拖拽/删除
+  function layerLockedOf(elId) {
+    var el = state.elements.find(function (it) { return it.id === elId; });
+    var l = el && layerById(el.layer);
+    return !!(l && l.locked);
+  }
+
+  // 确保至少存在一个默认图层，并为无 layer 归属的旧元素补全归属
+  function ensureLayers() {
+    if (!state.layers.length) {
+      state.layers.push({ id: lid(), name: "图层 1", visible: true, locked: false });
+    }
+    if (!state.activeLayerId || !layerById(state.activeLayerId)) {
+      state.activeLayerId = state.layers[state.layers.length - 1].id;
+    }
+    var hasLayer = {};
+    state.layers.forEach(function (l) { hasLayer[l.id] = true; });
+    state.elements.forEach(function (el) {
+      if (!el.layer || !hasLayer[el.layer]) el.layer = state.activeLayerId;
+    });
+    // 归组不变量：按图层顺序重新排列元素（稳定排序，组内保持原序）
+    var order = {};
+    state.layers.forEach(function (l, i) { order[l.id] = i; });
+    state.elements.sort(function (a, b) {
+      return order[a.layer] - order[b.layer];
+    });
+  }
+
   function cloneElements(list) {
     return (list || state.elements).map(function (el) {
       var c = Object.assign({}, el);
@@ -53,9 +151,10 @@
 
   function commit() {
     var last = state.history[state.historyIdx];
-    if (last && JSON.stringify(last) === JSON.stringify(state.elements)) return;
+    var snap = { elements: cloneElements(), layers: cloneLayers(), activeLayerId: state.activeLayerId };
+    if (last && JSON.stringify(last) === JSON.stringify(snap)) return;
     state.history = state.history.slice(0, state.historyIdx + 1);
-    state.history.push(cloneElements());
+    state.history.push(snap);
     if (state.history.length > HISTORY_LIMIT) state.history.shift();
     state.historyIdx = state.history.length - 1;
     updateHistoryButtons();
@@ -74,7 +173,11 @@
   }
 
   function restore() {
-    state.elements = cloneElements(state.history[state.historyIdx]);
+    var snap = state.history[state.historyIdx];
+    state.elements = cloneElements(snap.elements);
+    state.layers = cloneLayers(snap.layers);
+    state.activeLayerId = snap.activeLayerId;
+    if (!state.layers.length) ensureLayers();
     render();
     renderLayers();
     updatePropsPanel();
@@ -155,12 +258,13 @@
 
   function addEmoji(ch) {
     var size = Math.max(80, Math.min(320, Math.round(state.baseW / 8)));
-    state.elements.push({
+    var el = {
       id: uid(), kind: "emoji", emoji: ch, img: null,
       cx: state.baseW / 2, cy: state.baseH / 2,
       w: size, h: size, rot: 0, opacity: 1
-    });
-    state.selectedId = state.elements[state.elements.length - 1].id;
+    };
+    addElementToLayer(el);
+    state.selectedId = el.id;
     render(); renderLayers(); updatePropsPanel();
   }
 
@@ -184,7 +288,7 @@
       cx: p.x, cy: p.y, rot: 0, opacity: 1, w: 1, h: 1
     };
     remeasureText(el);
-    state.elements.push(el);
+    addElementToLayer(el);
     state.selectedId = el.id;
     setTool("select");
     render(); renderLayers(); updatePropsPanel();
@@ -254,12 +358,13 @@
     loadImage("/api/image/" + item.id).then(function (img) {
       var w = Math.min(600, Math.max(120, Math.round(state.baseW / 3)));
       var h = Math.round((w * img.height) / img.width);
-      state.elements.push({
+      var el = {
         id: uid(), kind: "image", emoji: null, img: img,
         cx: state.baseW / 2, cy: state.baseH / 2,
         w: w, h: h, rot: 0, opacity: 1
-      });
-      state.selectedId = state.elements[state.elements.length - 1].id;
+      };
+      addElementToLayer(el);
+      state.selectedId = el.id;
       render(); renderLayers(); updatePropsPanel();
     }).catch(function () { toast("图片加载失败"); });
   }
@@ -352,12 +457,13 @@
     ctx.clearRect(0, 0, cssW, cssH);
     ctx.setTransform(state.scale * dpr, 0, 0, state.scale * dpr, 0, 0);
     paintBackground(ctx, state.baseW, state.baseH);
-    state.elements.forEach(function (el) { drawElement(ctx, el); });
+    visibleElements().forEach(function (el) { drawElement(ctx, el); });
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     if (drag && drag.snapX) drawGuide(drag.nx * state.scale, "v");
     if (drag && drag.snapY) drawGuide(drag.ny * state.scale, "h");
     var sel = getSelected();
     if (sel) drawHandles(sel);
+    persistDraft();
   }
 
   function drawGuide(pos, dir) {
@@ -417,6 +523,9 @@
   function hitTest(px, py) {
     for (var i = state.elements.length - 1; i >= 0; i--) {
       var el = state.elements[i];
+      // 隐藏/锁定图层的元素不可选中
+      var l = layerById(el.layer);
+      if (l && (l.visible === false || l.locked)) continue;
       var dx = px - el.cx, dy = py - el.cy;
       var a = (-el.rot * Math.PI) / 180;
       var lx = dx * Math.cos(a) - dy * Math.sin(a);
@@ -445,9 +554,13 @@
     var sel = getSelected();
 
     if (state.tool === "text") { addTextAt(p); return; }
-    if (state.tool === "brush") { beginBrush(p); return; }
+    if (state.tool === "brush") {
+      if (activeLayer().locked) { toast("当前图层已锁定，无法绘制"); return; }
+      beginBrush(p); return;
+    }
 
     if (sel) {
+      if (layerLockedOf(sel.id)) { toast("图层已锁定，无法编辑元素"); return; }
       var h = handlePoints(sel);
       for (var i = 0; i < 4; i++) {
         if (dist(sp, h.pts[i]) < 10) {
@@ -502,6 +615,12 @@
     var p = getPos(e);
     var el = state.elements.find(function (it) { return it.id === drag.id; });
     if (!el) return;
+    // 图层在拖拽期间被锁定则放弃本次操作
+    if (drag.mode !== "brush" && layerLockedOf(el.id)) {
+      drag = null;
+      toast("图层已锁定，无法编辑元素");
+      return;
+    }
 
     if (drag.mode === "brush") {
       var d = Math.hypot(p.x - drag.last.x, p.y - drag.last.y);
@@ -572,6 +691,8 @@
   // ==================== 选择与属性面板 ====================
   function select(id) {
     state.selectedId = id;
+    var el = getSelected();
+    if (el) state.activeLayerId = el.layer;
     render();
     renderLayers();
     updatePropsPanel();
@@ -630,6 +751,7 @@
     $("#textContent").addEventListener("input", function () {
       var el = getSelected();
       if (!el) return;
+      if (layerLockedOf(el.id)) return;
       el.text = this.value;
       remeasureText(el);
       render();
@@ -639,6 +761,7 @@
     $("#textFont").addEventListener("change", function () {
       var el = getSelected();
       if (!el) return;
+      if (layerLockedOf(el.id)) { toast("图层已锁定，无法编辑元素"); return; }
       el.font = this.value;
       remeasureText(el);
       render(); commit();
@@ -646,6 +769,7 @@
     $("#textColor").addEventListener("input", function () {
       var el = getSelected();
       if (!el) return;
+      if (layerLockedOf(el.id)) return;
       el.color = this.value;
       $("#textColorHex").textContent = this.value;
       render();
@@ -653,6 +777,7 @@
     $("#textBold").addEventListener("change", function () {
       var el = getSelected();
       if (!el) return;
+      if (layerLockedOf(el.id)) { toast("图层已锁定，无法编辑元素"); return; }
       el.bold = this.checked;
       remeasureText(el);
       render(); commit();
@@ -660,6 +785,7 @@
     $("#textItalic").addEventListener("change", function () {
       var el = getSelected();
       if (!el) return;
+      if (layerLockedOf(el.id)) { toast("图层已锁定，无法编辑元素"); return; }
       el.italic = this.checked;
       remeasureText(el);
       render(); commit();
@@ -667,6 +793,7 @@
     $("#textLineHeight").addEventListener("input", function () {
       var el = getSelected();
       if (!el) return;
+      if (layerLockedOf(el.id)) return;
       el.lineHeight = parseInt(this.value, 10) / 100;
       $("#textLineHeightVal").textContent = this.value + "%";
       remeasureText(el);
@@ -677,6 +804,7 @@
       b.addEventListener("click", function () {
         var el = getSelected();
         if (!el) return;
+        if (layerLockedOf(el.id)) { toast("图层已锁定，无法编辑元素"); return; }
         el.align = b.dataset.align;
         document.querySelectorAll("#textAlign [data-align]").forEach(function (x) {
           x.classList.toggle("active", x === b);
@@ -697,7 +825,7 @@
       cx: Math.round(p.x * 10) / 10, cy: Math.round(p.y * 10) / 10,
       points: [{ x: 0, y: 0 }], w: cfg.size, h: cfg.size, rot: 0
     };
-    state.elements.push(el);
+    addElementToLayer(el);
     state.selectedId = el.id;
     drag = { mode: "brush", id: el.id, last: { x: p.x, y: p.y } };
     render(); renderLayers(); updatePropsPanel();
@@ -741,70 +869,141 @@
 
   function renderLayers() {
     var list = $("#layerList");
-    $("#layerCount").textContent = state.elements.length;
-    $("#layerEmpty").hidden = state.elements.length > 0;
+    $("#layerCount").textContent = state.layers.length;
+    $("#layerEmpty").hidden = state.layers.length > 0;
     var html = "";
-    for (var i = state.elements.length - 1; i >= 0; i--) {
-      var el = state.elements[i];
-      var thumb;
-      if (el.kind === "emoji") thumb = el.emoji;
-      else if (el.kind === "text") thumb = '<span class="lay-ico t">T</span>';
-      else if (el.kind === "brush") thumb = '<span class="lay-ico b" style="background:' + (el.color || "#fff") + '"></span>';
-      else thumb = '<img src="/api/image/' + assetIdOf(el) + '" alt="">';
+    // 图层列表自上而下 = 最上层在前
+    for (var i = state.layers.length - 1; i >= 0; i--) {
+      var l = state.layers[i];
+      var cnt = elementsOfLayer(l.id).length;
       html +=
-        '<div class="layer-item' + (el.id === state.selectedId ? " active" : "") + '" data-id="' + el.id + '">' +
-        '<span class="thumb">' + thumb + "</span>" +
-        '<span class="name">' + layerName(el) + "</span>" +
+        '<div class="layer-item' +
+        (l.id === state.activeLayerId ? " active" : "") +
+        (l.visible === false ? " hidden" : "") +
+        (l.locked ? " locked" : "") +
+        '" data-id="' + l.id + '">' +
+        '<button class="vis" data-act="vis" title="' + (l.visible === false ? "显示图层" : "隐藏图层") + '">' +
+        (l.visible === false ? "🈲" : "👁") + "</button>" +
+        '<span class="name" title="' + escapeHtml(l.name) + '">' + escapeHtml(l.name) + "</span>" +
+        '<span class="cnt">' + cnt + "</span>" +
         '<span class="ops">' +
-        '<button data-act="up" title="上移一层">▲</button>' +
-        '<button data-act="down" title="下移一层">▼</button>' +
-        '<button data-act="del" class="del" title="删除">✕</button>' +
+        '<button data-act="lock" title="' + (l.locked ? "解锁图层" : "锁定图层") + '">' + (l.locked ? "🔓" : "🔒") + "</button>" +
+        '<button data-act="up" title="上移图层（Ctrl+Shift+]）">▲</button>' +
+        '<button data-act="down" title="下移图层（Ctrl+Shift+[）">▼</button>' +
+        '<button data-act="del" class="del" title="删除图层">✕</button>' +
         "</span></div>";
     }
     list.innerHTML = html;
   }
 
-  function layerName(el) {
-    if (el.kind === "emoji") return "Emoji " + el.emoji;
-    if (el.kind === "text") return "文字";
-    if (el.kind === "brush") return "笔刷";
-    return el.img && el.img.src ? el.img.src.split("/").pop() : "图片";
+  // 激活图层：设为活动图层并选中该层最上层元素
+  function activateLayer(id) {
+    state.activeLayerId = id;
+    var els = elementsOfLayer(id);
+    state.selectedId = els.length ? els[els.length - 1].id : null;
+    render(); renderLayers(); updatePropsPanel();
   }
 
-  function assetIdOf(el) {
-    // 通过已加载图片的 src 反查素材 id（形如 /api/image/xxxx）
-    if (!el.img || !el.img.src) return "";
-    var m = el.img.src.match(/\/api\/image\/([a-z0-9]+)/);
-    return m ? m[1] : "";
+  // 图层内移动元素 z 序（复用原能力：Ctrl+]/[）
+  function moveElementInLayer(el, dir) {
+    var els = elementsOfLayer(el.layer);
+    var idx = els.indexOf(el);
+    var target = dir === "up" ? idx + 1 : idx - 1;
+    if (target < 0 || target >= els.length) return false;
+    var block = layerRange(el.layer);
+    var absIdx = block[0] + idx;
+    var absTarget = block[0] + target;
+    state.elements.splice(absIdx, 1);
+    state.elements.splice(absTarget, 0, el);
+    return true;
+  }
+
+  function createLayer(name) {
+    var l = { id: lid(), name: name || ("图层 " + (state.layers.length + 1)), visible: true, locked: false };
+    state.layers.push(l);
+    state.activeLayerId = l.id;
+    state.selectedId = null;
+    commit();
+    render(); renderLayers(); updatePropsPanel();
+    return l;
+  }
+
+  function deleteLayer(id) {
+    if (state.layers.length <= 1) { toast("至少保留一个图层"); return; }
+    commit();
+    var r = layerRange(id);
+    if (r[0] !== -1) state.elements.splice(r[0], r[1] - r[0]);
+    var idx = layerIndex(id);
+    state.layers.splice(idx, 1);
+    if (state.activeLayerId === id) {
+      state.activeLayerId = state.layers[Math.max(0, Math.min(idx, state.layers.length - 1))].id;
+    }
+    if (state.selectedId && !state.elements.some(function (it) { return it.id === state.selectedId; })) {
+      state.selectedId = null;
+    }
+    render(); renderLayers(); updatePropsPanel();
+  }
+
+  function moveLayer(id, dir) {
+    var idx = layerIndex(id);
+    var target = dir === "up" ? idx + 1 : idx - 1;
+    if (target < 0 || target >= state.layers.length) return;
+    commit();
+    var l = state.layers[idx];
+    state.layers.splice(idx, 1);
+    state.layers.splice(target, 0, l);
+    // 按新图层顺序重组元素（组内保持原序，维持归组不变量）
+    var reordered = [];
+    state.layers.forEach(function (ly) {
+      elementsOfLayer(ly.id).forEach(function (el) { reordered.push(el); });
+    });
+    state.elements = reordered;
+    render(); renderLayers(); updatePropsPanel();
+  }
+
+  function toggleLayerVis(id) {
+    var l = layerById(id);
+    if (!l) return;
+    commit();
+    l.visible = l.visible === false ? true : false;
+    if (l.visible === false && state.activeLayerId === id) state.selectedId = null;
+    render(); renderLayers(); updatePropsPanel();
+  }
+
+  function toggleLayerLock(id) {
+    var l = layerById(id);
+    if (!l) return;
+    commit();
+    l.locked = !l.locked;
+    if (l.locked && state.activeLayerId === id) state.selectedId = null;
+    render(); renderLayers(); updatePropsPanel();
+  }
+
+  function renameLayer(id, name) {
+    var l = layerById(id);
+    if (!l) return;
+    name = (name || "").trim();
+    if (!name) return;
+    commit();
+    l.name = name;
+    render(); renderLayers();
   }
 
   $("#layerList").addEventListener("click", function (e) {
     var item = e.target.closest(".layer-item");
     if (!item) return;
     var id = item.dataset.id;
-    var el = state.elements.find(function (it) { return it.id === id; });
-    if (!el) return;
     var act = e.target.closest("button") && e.target.closest("button").dataset.act;
-    var idx = state.elements.indexOf(el);
-    if (act === "up") {
-      commit();
-      if (idx < state.elements.length - 1) {
-        state.elements.splice(idx, 1);
-        state.elements.splice(idx + 1, 0, el);
-      }
-    } else if (act === "down") {
-      commit();
-      if (idx > 0) {
-        state.elements.splice(idx, 1);
-        state.elements.splice(idx - 1, 0, el);
-      }
-    } else if (act === "del") {
+    if (!act) { activateLayer(id); return; }
+    if (act === "vis") toggleLayerVis(id);
+    else if (act === "lock") toggleLayerLock(id);
+    else if (act === "up") moveLayer(id, "up");
+    else if (act === "down") moveLayer(id, "down");
+    else if (act === "del") {
       var btn = e.target.closest("button");
       if (btn.dataset.armed) {
-        commit();
-        state.elements.splice(idx, 1);
-        if (state.selectedId === id) state.selectedId = null;
         btn.dataset.armed = "";
+        deleteLayer(id);
       } else {
         btn.dataset.armed = "1";
         btn.textContent = "确定?";
@@ -815,18 +1014,50 @@
           }
         }, 2200);
       }
-      render(); renderLayers(); updatePropsPanel();
-      return;
-    } else {
-      select(id);
-      return;
     }
-    render(); renderLayers(); updatePropsPanel();
+  });
+
+  // 双击图层名称行内改名
+  $("#layerList").addEventListener("dblclick", function (e) {
+    var item = e.target.closest(".layer-item");
+    if (!item) return;
+    var id = item.dataset.id;
+    var name = item.querySelector(".name");
+    if (!name || item.querySelector("input.rename")) return;
+    var l = layerById(id);
+    if (!l) return;
+    var inp = document.createElement("input");
+    inp.className = "rename";
+    inp.value = l.name;
+    name.replaceWith(inp);
+    inp.focus();
+    inp.select();
+    var finished = false;
+    var done = function (save) {
+      if (finished) return;
+      finished = true;
+      var v = inp.value;
+      inp.replaceWith(name);
+      if (save && v !== l.name) renameLayer(id, v);
+      else renderLayers();
+    };
+    inp.addEventListener("blur", function () { done(true); });
+    inp.addEventListener("keydown", function (ev) {
+      if (ev.key === "Enter") { ev.preventDefault(); done(true); }
+      else if (ev.key === "Escape") { ev.preventDefault(); done(false); }
+    });
+  });
+
+  $("#layerAddBtn").addEventListener("click", function () {
+    createLayer();
   });
 
   // 属性滑块
   function bindPropSlider(slider, label, apply) {
     slider.addEventListener("input", function () {
+      var el = getSelected();
+      if (!el) return;
+      if (layerLockedOf(el.id)) { toast("图层已锁定，无法编辑元素"); return; }
       apply(parseInt(slider.value, 10));
       render();
       updatePropsPanel();
@@ -853,6 +1084,7 @@
   $("#propDelete").addEventListener("click", function () {
     var el = getSelected();
     if (!el) return;
+    if (layerLockedOf(el.id)) { toast("图层已锁定，无法删除元素"); return; }
     var btn = this;
     if (btn.dataset.armed) {
       commit();
@@ -927,7 +1159,7 @@
       tc.fillRect(0, 0, c.width, c.height);
     }
     paintBackground(tc, c.width, c.height);
-    state.elements.forEach(function (el) { drawElement(tc, el); });
+    visibleElements().forEach(function (el) { drawElement(tc, el); });
     var mime = type === "jpg" ? "image/jpeg" : "image/png";
     var dataUrl = c.toDataURL(mime, 0.92);
     $("#exportPngBtn").disabled = true;
@@ -936,13 +1168,135 @@
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ dataUrl: dataUrl, filename: "wallpaper-" + state.baseW + "x" + state.baseH })
     }).then(function (d) {
-      toast("已导出：" + d.path);
+      if (d.ok) {
+        toast("已导出：" + d.path);
+      } else {
+        var msg = d.error || "导出失败";
+        if (d.suggestion) msg += "（" + d.suggestion + "）";
+        toast(msg);
+      }
     }).catch(function () {
       toast("导出失败，请检查服务");
     }).then(function () {
       $("#exportPngBtn").disabled = false;
     });
   }
+
+  // ==================== 导出位置设置 ====================
+  var exportCfg = { dir: null, defaultDir: "" };
+
+  // 不抛错的请求：400 等错误也返回 JSON body，供 error/suggestion 展示
+  function apiBody(path, opts) {
+    return fetch(path, opts).then(function (r) {
+      return r.json().catch(function () {
+        return { ok: false, error: "服务响应异常（HTTP " + r.status + "）" };
+      });
+    });
+  }
+
+  function loadExportSettings() {
+    api("/api/export/settings").then(function (d) {
+      if (!d.ok) return;
+      exportCfg = { dir: d.dir, defaultDir: d.default_dir };
+      refreshExportPathBtn();
+    }).catch(function () { /* 服务不可用时保持默认 */ });
+  }
+
+  function refreshExportPathBtn() {
+    var btn = $("#exportPathBtn");
+    if (exportCfg.dir) {
+      btn.textContent = "📁 " + exportCfg.dir;
+      btn.title = "导出位置：" + exportCfg.dir + "（点击修改）";
+      btn.classList.add("has-path");
+    } else {
+      btn.textContent = "📁";
+      btn.title = "设置导出位置（当前：默认目录）";
+      btn.classList.remove("has-path");
+    }
+  }
+
+  function openPathModal() {
+    $("#pathStatus").textContent = "";
+    $("#pathError").hidden = true;
+    var custom = exportCfg.dir || "";
+    if (custom) {
+      document.querySelector('input[name="pathMode"][value="custom"]').checked = true;
+      $("#pathCustom").hidden = false;
+      $("#pathInput").value = custom;
+    } else {
+      document.querySelector('input[name="pathMode"][value="default"]').checked = true;
+      $("#pathCustom").hidden = true;
+      $("#pathInput").value = "";
+    }
+    $("#pathModal").hidden = false;
+  }
+
+  function setPathError(msg) {
+    var el = $("#pathError");
+    el.hidden = !msg;
+    if (msg) el.textContent = msg;
+  }
+
+  $("#exportPathBtn").addEventListener("click", openPathModal);
+  $("#pathClose").addEventListener("click", function () { $("#pathModal").hidden = true; });
+  $("#pathCancelBtn").addEventListener("click", function () { $("#pathModal").hidden = true; });
+  $("#pathModal").addEventListener("click", function (e) {
+    if (e.target === this) $("#pathModal").hidden = true;
+  });
+  document.querySelectorAll('input[name="pathMode"]').forEach(function (r) {
+    r.addEventListener("change", function () {
+      $("#pathCustom").hidden = this.value !== "custom";
+      setPathError("");
+    });
+  });
+
+  $("#pathBrowseBtn").addEventListener("click", function () {
+    setPathError("");
+    $("#pathBrowseBtn").disabled = true;
+    apiBody("/api/export/pick-dir", { method: "POST" }).then(function (d) {
+      if (d.ok && d.dir) {
+        $("#pathInput").value = d.dir;
+      } else if (!d.ok) {
+        setPathError(d.error || "无法打开目录选择器");
+      }
+      // d.dir 为空表示用户取消，静默关闭
+    }).catch(function () {
+      setPathError("无法连接服务，请确认本地服务已启动");
+    }).then(function () {
+      $("#pathBrowseBtn").disabled = false;
+    });
+  });
+
+  $("#pathSaveBtn").addEventListener("click", function () {
+    var mode = document.querySelector('input[name="pathMode"]:checked').value;
+    var dir = mode === "custom" ? $("#pathInput").value : "";
+    var autoCreate = $("#pathAutoCreate").checked;
+    setPathError("");
+    $("#pathSaveBtn").disabled = true;
+    apiBody("/api/export/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ dir: dir, autoCreate: autoCreate })
+    }).then(function (d) {
+      if (d.ok) {
+        exportCfg.dir = d.dir || null;
+        exportCfg.defaultDir = d.default_dir;
+        refreshExportPathBtn();
+        $("#pathStatus").textContent = d.message || "";
+        if (!d.dir) {
+          // 恢复默认：同步关闭自定义区域
+          document.querySelector('input[name="pathMode"][value="default"]').checked = true;
+          $("#pathCustom").hidden = true;
+        }
+      } else {
+        setPathError((d.error || "保存失败") + (d.suggestion ? "；" + d.suggestion : ""));
+      }
+    }).catch(function () {
+      setPathError("无法连接服务，请确认本地服务已启动");
+    }).then(function () {
+      $("#pathSaveBtn").disabled = false;
+    });
+  });
 
   // ==================== 动态壁纸（应用当前画布） ====================
   function serializeComposition() {
@@ -953,25 +1307,90 @@
         angle: state.bg.angle, imageId: state.bg.imageId
       },
       baseW: state.baseW, baseH: state.baseH,
-      elements: state.elements.map(function (el) {
-        var o = {
-          id: el.id, kind: el.kind,
-          cx: el.cx, cy: el.cy, w: el.w, h: el.h,
-          rot: el.rot || 0, opacity: el.opacity == null ? 1 : el.opacity
-        };
-        if (el.kind === "emoji") o.emoji = el.emoji;
-        else if (el.kind === "image") o.assetId = assetIdOf(el);
-        else if (el.kind === "text") {
-          o.text = el.text; o.font = el.font; o.fontSize = el.fontSize;
-          o.color = el.color; o.align = el.align;
-          o.bold = !!el.bold; o.italic = !!el.italic; o.lineHeight = el.lineHeight;
-        } else if (el.kind === "brush") {
-          o.brush = el.brush; o.size = el.size; o.color = el.color;
-          o.points = (el.points || []).map(function (p) { return { x: p.x, y: p.y }; });
-        }
-        return o;
-      })
+      layers: cloneLayers(),
+      activeLayerId: state.activeLayerId,
+      elements: state.elements.map(serializeElement)
     };
+  }
+
+  // ==================== 草稿持久化（localStorage） ====================
+  var DRAFT_KEY = "wm_draft_v1";
+  var draftTimer = null;
+
+  function serializeElement(el) {
+    var o = {
+      id: el.id, kind: el.kind, layer: el.layer,
+      cx: el.cx, cy: el.cy, w: el.w, h: el.h,
+      rot: el.rot || 0, opacity: el.opacity == null ? 1 : el.opacity
+    };
+    if (el.kind === "emoji") o.emoji = el.emoji;
+    else if (el.kind === "image") o.assetId = assetIdOf(el);
+    else if (el.kind === "text") {
+      o.text = el.text; o.font = el.font; o.fontSize = el.fontSize;
+      o.color = el.color; o.align = el.align;
+      o.bold = !!el.bold; o.italic = !!el.italic; o.lineHeight = el.lineHeight;
+    } else if (el.kind === "brush") {
+      o.brush = el.brush; o.size = el.size; o.color = el.color;
+      o.points = (el.points || []).map(function (p) { return { x: p.x, y: p.y }; });
+    }
+    return o;
+  }
+
+  function persistDraft() {
+    clearTimeout(draftTimer);
+    draftTimer = setTimeout(function () {
+      try {
+        var draft = {
+          bg: { type: state.bg.type, color: state.bg.color, grad1: state.bg.grad1, grad2: state.bg.grad2, angle: state.bg.angle, imageId: state.bg.imageId },
+          baseW: state.baseW, baseH: state.baseH,
+          layers: cloneLayers(),
+          activeLayerId: state.activeLayerId,
+          elements: state.elements.map(serializeElement)
+        };
+        localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+      } catch (err) { /* 存储不可用时静默忽略 */ }
+    }, 600);
+  }
+
+  function loadDraft() {
+    try {
+      var raw = localStorage.getItem(DRAFT_KEY);
+      if (!raw) return;
+      var d = JSON.parse(raw);
+      if (!d || !d.elements) return;
+      state.bg = Object.assign({}, state.bg, d.bg || {});
+      state.baseW = d.baseW || state.baseW;
+      state.baseH = d.baseH || state.baseH;
+      state.layers = d.layers && d.layers.length
+        ? d.layers.map(function (l) { return Object.assign({ visible: true, locked: false }, l); })
+        : [];
+      state.activeLayerId = d.activeLayerId || null;
+      state.elements = (d.elements || []).map(function (o) {
+        var el = Object.assign({}, o);
+        if (o.kind === "image" && o.assetId) el.img = null; // 图片引用稍后异步恢复
+        return el;
+      });
+      ensureLayers();
+      // 异步恢复背景图与元素图片引用
+      var jobs = [];
+      if (state.bg.type === "image" && state.bg.imageId) {
+        jobs.push(loadImage("/api/image/" + state.bg.imageId)
+          .then(function (im) { state.bg.imageEl = im; }).catch(function () {}));
+      }
+      state.elements.forEach(function (el) {
+        if (el.kind === "image" && el.assetId) {
+          jobs.push(loadImage("/api/image/" + el.assetId)
+            .then(function (im) { el.img = im; }).catch(function () {}));
+        }
+      });
+      if (jobs.length) {
+        Promise.all(jobs).then(function () {
+          render(); renderLayers(); updatePropsPanel();
+        });
+      }
+    } catch (err) {
+      // 草稿损坏：回退空画布
+    }
   }
 
   function applyDynamic() {
@@ -1020,10 +1439,26 @@
     if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z") { e.preventDefault(); undo(); return; }
     if (((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "z") || ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "y")) { e.preventDefault(); redo(); return; }
 
+    // ---------- 图层快捷键 ----------
+    var ctrl = e.ctrlKey || e.metaKey;
+    var k = e.key.toLowerCase();
+    if (ctrl && e.shiftKey && k === "n") { e.preventDefault(); createLayer(); return; }
+    if (ctrl && e.shiftKey && e.key === "Delete") { e.preventDefault(); deleteLayer(state.activeLayerId); return; }
+    if (ctrl && e.shiftKey && e.key === "]") { e.preventDefault(); moveLayer(state.activeLayerId, "up"); return; }
+    if (ctrl && e.shiftKey && e.key === "[") { e.preventDefault(); moveLayer(state.activeLayerId, "down"); return; }
+    if (ctrl && e.shiftKey && k === "h") { e.preventDefault(); toggleLayerVis(state.activeLayerId); return; }
+    if (ctrl && e.shiftKey && k === "l") { e.preventDefault(); toggleLayerLock(state.activeLayerId); return; }
+    if (e.key === "F2") { e.preventDefault(); startRenameActive(); return; }
+
     var el = getSelected();
     if (!el) return;
+    // 元素层内 z 序调整（Ctrl+]/[），变更前存档以便撤销
+    if (ctrl && e.key === "]") { e.preventDefault(); commit(); if (moveElementInLayer(el, "up")) { render(); renderLayers(); updatePropsPanel(); } return; }
+    if (ctrl && e.key === "[") { e.preventDefault(); commit(); if (moveElementInLayer(el, "down")) { render(); renderLayers(); updatePropsPanel(); } return; }
+
     if (e.key === "Delete" || e.key === "Backspace") {
       e.preventDefault();
+      if (layerLockedOf(el.id)) { toast("图层已锁定，无法删除元素"); return; }
       commit();
       state.elements = state.elements.filter(function (it) { return it.id !== el.id; });
       state.selectedId = null;
@@ -1031,11 +1466,44 @@
       return;
     }
     var step = e.shiftKey ? 10 : 1;
-    if (e.key === "ArrowLeft") { e.preventDefault(); commit(); el.cx -= step; render(); renderLayers(); updatePropsPanel(); }
-    else if (e.key === "ArrowRight") { e.preventDefault(); commit(); el.cx += step; render(); renderLayers(); updatePropsPanel(); }
-    else if (e.key === "ArrowUp") { e.preventDefault(); commit(); el.cy -= step; render(); renderLayers(); updatePropsPanel(); }
-    else if (e.key === "ArrowDown") { e.preventDefault(); commit(); el.cy += step; render(); renderLayers(); updatePropsPanel(); }
+    if (e.key === "ArrowLeft" || e.key === "ArrowRight" || e.key === "ArrowUp" || e.key === "ArrowDown") {
+      if (layerLockedOf(el.id)) { toast("图层已锁定，无法移动元素"); return; }
+      if (e.key === "ArrowLeft") { e.preventDefault(); commit(); el.cx -= step; }
+      else if (e.key === "ArrowRight") { e.preventDefault(); commit(); el.cx += step; }
+      else if (e.key === "ArrowUp") { e.preventDefault(); commit(); el.cy -= step; }
+      else if (e.key === "ArrowDown") { e.preventDefault(); commit(); el.cy += step; }
+      render(); renderLayers(); updatePropsPanel();
+    }
   });
+
+  // F2 重命名活动图层：唤起面板行内编辑
+  function startRenameActive() {
+    var item = document.querySelector('#layerList .layer-item[data-id="' + state.activeLayerId + '"]');
+    if (!item) return;
+    var name = item.querySelector(".name");
+    if (!name || item.querySelector("input.rename")) return;
+    var l = layerById(state.activeLayerId);
+    var inp = document.createElement("input");
+    inp.className = "rename";
+    inp.value = l.name;
+    name.replaceWith(inp);
+    inp.focus();
+    inp.select();
+    var finished = false;
+    var done = function (save) {
+      if (finished) return;
+      finished = true;
+      var v = inp.value;
+      inp.replaceWith(name);
+      if (save && v !== l.name) renameLayer(state.activeLayerId, v);
+      else renderLayers();
+    };
+    inp.addEventListener("blur", function () { done(true); });
+    inp.addEventListener("keydown", function (ev) {
+      if (ev.key === "Enter") { ev.preventDefault(); done(true); }
+      else if (ev.key === "Escape") { ev.preventDefault(); done(false); }
+    });
+  }
 
   // ==================== 工具栏绑定 ====================
   function buildSizeOptions() {
@@ -1165,18 +1633,34 @@
     buildCats();
     renderEmojiGrid();
     buildSizeOptions();
+    loadDraft();          // 恢复上次草稿（含图层状态），无则空画布
+    ensureLayers();
+    // 画布尺寸下拉同步草稿尺寸
+    var sizeSel = $("#canvasSize");
+    var preset = state.baseW + "x" + state.baseH;
+    if (sizeSel.querySelector('option[value="' + preset + '"]')) sizeSel.value = preset;
+    else {
+      var opt = document.createElement("option");
+      opt.value = preset;
+      opt.textContent = preset + " · 草稿";
+      sizeSel.appendChild(opt);
+      sizeSel.value = preset;
+    }
     initToolbar();
     initBgControls();
+    renderBgControls();
     initPanels();
     bindTextCtl();
     bindBrushCtl();
     updateCanvasSize();
     fitZoom();
-    state.history.push(cloneElements());
+    state.history.push({ elements: cloneElements(), layers: cloneLayers(), activeLayerId: state.activeLayerId });
     state.historyIdx = 0;
     render();
+    renderLayers();
     updateHistoryButtons();
     loadAssets();
+    loadExportSettings();
     window.addEventListener("resize", function () {
       if (state.scale >= 1) fitZoom();
     });
