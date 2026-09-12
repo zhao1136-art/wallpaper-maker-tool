@@ -18,6 +18,7 @@ dyn_debug*.log
 
 # 本地素材（示例/分享壁纸）
 *.jpg
+!docs/hero.jpg
 
 # 打包产物
 build/

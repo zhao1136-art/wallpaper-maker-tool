@@ -1,5 +1,17 @@
 # 壁纸工坊 WallpaperMaker
 
+<p align="center">
+  <img src="docs/hero.jpg" width="100%" alt="壁纸工坊 - 桌面壁纸制作与管理系统">
+</p>
+
+<p align="center">
+  <a href="#功能特性"><img src="https://img.shields.io/badge/功能-编辑器%20·%20壁纸中心%20·%20设置-blueviolet"></a>
+  <a href="#使用示例"><img src="https://img.shields.io/badge/平台-Windows%2010%2F11-0078D6"></a>
+  <a href="#快速开始"><img src="https://img.shields.io/badge/Python-3.10%2B-3776AB"></a>
+  <a href="#快速开始"><img src="https://img.shields.io/badge/渲染-WebView2-4B8BF5"></a>
+  <a href="#快速开始"><img src="https://img.shields.io/badge/依赖-pywebview%20%2B%20Pillow-2ea44f"></a>
+</p>
+
 一款基于 **Python + pywebview + Canvas** 的 Windows 桌面壁纸制作与管理系统。内置 1045 个 Emoji 素材库，支持画布创作、壁纸中心、动态壁纸引擎、定时切换与以图搜图，界面运行在软件内置浏览器（WebView2）中。
 
 > 本项目为个人学习交流项目，仅支持 Windows 10 / 11。
@@ -26,6 +38,83 @@
 - **定时切换**：后台调度线程，按间隔自动轮换（顺序 / 随机）
 - **节能模式**：检测全屏应用与笔记本电池状态，自动暂停动态壁纸渲染
 - **多显示器**：按虚拟桌面逻辑坐标定位，动态壁纸每屏独立或整屏拼接
+
+## 使用示例
+
+### 示例 1：用 Emoji 制作一张壁纸
+
+1. 启动应用后进入**编辑器**页签，右侧选尺寸预设（如 1920×1080）
+2. 左侧素材面板搜索 `星星` 或展开「活动与庆典」分类，点击 Emoji 加入画布
+3. 画布中拖拽移动、滚轮缩放、拖动手柄旋转，右侧面板调整图层顺序
+4. 设置渐变背景（默认已给蓝橙渐变，可改角度与颜色）
+5. 点击工具栏「导出」，选择 PNG 与分辨率，成品保存到 `assets/exports/`
+
+程序化生成的内置壁纸效果参考：
+
+| 极光青绿（内置精选 09） | 星空银河（内置精选 12） | 碧海波浪（内置精选 15） |
+| --- | --- | --- |
+| ![极光青绿](docs/screenshots/aurora-green.png) | ![星空银河](docs/screenshots/starfield.png) | ![碧海波浪](docs/screenshots/waves.png) |
+
+### 示例 2：启用动态壁纸
+
+1. 进入**壁纸中心**页签，上方是 4 张动态壁纸模板卡片（极光 / 星空 / 波浪 / 时钟），支持实时动画预览
+2. 点击目标模板的「启用」：约 1~2 秒后动画出现在桌面图标之下（WorkerW 宿主窗口）
+3. 顶栏状态条显示「● 动态壁纸运行中」，再次点击同卡「停止」恢复静态壁纸
+4. 多显示器时可在**设置**页选择「每屏独立」；开启「点击穿透」后鼠标可正常操作桌面
+
+### 示例 3：定时自动切换壁纸
+
+1. 进入**设置**页签，开启「定时切换」
+2. 间隔设为 30 分钟，来源选「壁纸库」，顺序选「随机」
+3. 应用会按配置轮换桌面壁纸，无需驻留额外进程（调度线程随应用常驻）
+
+### 示例 4：命令行 / HTTP API
+
+本地服务默认运行在 `http://127.0.0.1:8000`，可直接用 curl 调用：
+
+```bash
+# 将壁纸库中的星空银河设为桌面壁纸（适应模式）
+curl -X POST http://127.0.0.1:8000/api/wallpaper/set \
+  -H "Content-Type: application/json" \
+  -d '{"file": "wallpapers/builtin/12-星空银河.png", "mode": "fit"}'
+
+# 设为锁屏壁纸
+curl -X POST http://127.0.0.1:8000/api/wallpaper/lock \
+  -H "Content-Type: application/json" \
+  -d '{"file": "wallpapers/builtin/09-极光青绿.png"}'
+
+# 启用极光动态壁纸
+curl -X POST http://127.0.0.1:8000/api/dynamic/start \
+  -H "Content-Type: application/json" \
+  -d '{"wallpaper": "aurora"}'
+
+# 查询动态壁纸状态
+curl http://127.0.0.1:8000/api/dynamic/status
+
+# 以图搜图：上传图片后检索相似壁纸
+curl -X POST http://127.0.0.1:8000/api/wallpaper/search \
+  -H "Content-Type: application/json" \
+  -d '{"file": "assets/images/xxx.png"}'
+
+# 立即切换（顺序轮换）
+curl -X POST http://127.0.0.1:8000/api/wallpaper/next
+```
+
+常用 API 一览：
+
+| 接口 | 方法 | 说明 |
+| --- | --- | --- |
+| `/api/wallpaper/set` | POST | 设为桌面壁纸（mode: fit/fill/stretch/center/tile/span） |
+| `/api/wallpaper/lock` | POST | 设为锁屏壁纸 |
+| `/api/wallpaper/next` | POST | 立即切换壁纸 |
+| `/api/wallpaper/library` | GET | 壁纸库列表 |
+| `/api/wallpaper/generate` | POST | 生成精选壁纸 |
+| `/api/wallpaper/import` | POST | 导入图片到壁纸库 |
+| `/api/wallpaper/search` | POST | 以图搜图（dHash） |
+| `/api/dynamic/start` / `stop` | POST | 启用 / 停止动态壁纸 |
+| `/api/dynamic/status` | GET | 动态壁纸状态与节能暂停信息 |
+| `/api/dynamic/templates` | GET | 动态壁纸模板列表 |
+| `/api/config` | GET/POST | 读写全局配置 |
 
 ## 快速开始
 
@@ -82,6 +171,9 @@ wallpaper-maker/
 ├── requirements.txt     # 依赖清单
 ├── build.ps1            # PyInstaller 打包脚本
 ├── wallpaper.spec       # PyInstaller 配置
+├── docs/                # 文档与截图
+│   ├── hero.jpg         #   README 头图
+│   └── screenshots/     #   内置壁纸效果示例
 ├── core/                # 核心层
 │   ├── config.py        #   JSON 配置持久化（线程安全）
 │   ├── win32.py         #   Windows 系统控制（壁纸/锁屏/显示器/WorkerW）
