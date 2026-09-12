@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>桌面壁纸制作工具</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header id="topbar">
+  <div class="tb-group tb-left">
+    <span class="app-logo">🖼</span>
+    <span class="app-title">壁纸工坊</span>
+  </div>
+  <nav id="pageNav">
+    <button class="page-tab active" data-page="editor">✏️ 编辑器</button>
+    <button class="page-tab" data-page="wallpaper">🖼 壁纸中心</button>
+    <button class="page-tab" data-page="settings">⚙️ 设置</button>
+    <span class="tb-sep"></span>
+    <a id="devShareBtn" class="page-link" title="在系统浏览器打开开发者分享壁纸库">🧩 开发者分享壁纸</a>
+  </nav>
+  <div class="tb-group tb-right">
+    <span id="dynStatus" class="dyn-status" hidden></span>
+  </div>
+</header>
+
+<!-- ==================== 页面一：编辑器 ==================== -->
+<div class="page active" id="pageEditor">
+  <header id="toolbar">
+    <div class="tb-group tb-left">
+      <label class="tb-label" for="canvasSize">画布</label>
+      <select id="canvasSize" title="画布尺寸"></select>
+      <button id="btnSwap" class="tb-btn" title="横竖互换">⇄</button>
+      <label class="tb-label" for="bgType">背景</label>
+      <select id="bgType" title="背景类型">
+        <option value="solid">纯色</option>
+        <option value="gradient">渐变</option>
+        <option value="image">图片</option>
+        <option value="transparent">透明</option>
+      </select>
+      <span class="tb-sep"></span>
+      <button id="selToolBtn" class="tb-btn tool-btn active" data-tool="select" title="选择/移动">🖱 选择</button>
+      <button id="textToolBtn" class="tb-btn tool-btn" data-tool="text" title="点击画布添加文字">T 文字</button>
+      <button id="brushToolBtn" class="tb-btn tool-btn" data-tool="brush" title="自由绘制">✏ 绘制</button>
+    </div>
+
+    <div class="tb-group tb-center">
+      <button id="undoBtn" class="tb-btn" title="撤销 Ctrl+Z" disabled>↶</button>
+      <button id="redoBtn" class="tb-btn" title="重做 Ctrl+Shift+Z" disabled>↷</button>
+      <span class="tb-sep"></span>
+      <button id="zoomOutBtn" class="tb-btn" title="缩小">−</button>
+      <span id="zoomLabel" class="tb-zoom">100%</span>
+      <button id="zoomInBtn" class="tb-btn" title="放大">＋</button>
+      <button id="zoomFitBtn" class="tb-btn" title="适应窗口">适应</button>
+    </div>
+
+    <div class="tb-group tb-right">
+      <button id="dynApplyBtn" class="tb-btn" title="把当前画布作为动态壁纸应用到桌面">▶ 应用为动态壁纸</button>
+      <button id="exportPngBtn" class="tb-btn primary">导出 PNG</button>
+      <button id="exportJpgBtn" class="tb-btn">导出 JPG</button>
+    </div>
+  </header>
+
+  <main id="layout">
+    <aside id="leftPanel">
+      <div class="tabs">
+        <button class="tab active" data-tab="emoji">Emoji 库</button>
+        <button class="tab" data-tab="images">图片库</button>
+      </div>
+
+      <div id="emojiTab" class="tab-pane active">
+        <div class="search-box">
+          <input id="emojiSearch" type="search" placeholder="搜索表情，如：开心 / smile">
+        </div>
+        <nav id="emojiCats" class="cats"></nav>
+        <div id="emojiGrid" class="emoji-grid"></div>
+      </div>
+
+      <div id="imagesTab" class="tab-pane">
+        <div class="img-actions">
+          <button id="uploadBtn" class="btn primary block">＋ 加入图片</button>
+          <input type="file" id="fileInput" multiple accept="image/png,image/jpeg,image/webp,image/gif" hidden>
+        </div>
+        <div id="imgGrid" class="img-grid"></div>
+        <div id="imgEmpty" class="empty-tip" hidden>还没有图片素材<br>点击上方「加入图片」导入本地图片</div>
+      </div>
+    </aside>
+
+    <section id="canvasArea">
+      <div id="canvasWrap">
+        <canvas id="canvas"></canvas>
+      </div>
+      <div id="canvasHint" hidden></div>
+    </section>
+
+    <aside id="rightPanel">
+      <section class="rp-section">
+        <h3>背景设置</h3>
+        <div id="bgSolidCtl" class="ctl">
+          <div class="row">
+            <label>颜色</label>
+            <input type="color" id="bgColor" value="#1a2a6c">
+            <span class="hex" id="bgColorHex">#1a2a6c</span>
+          </div>
+        </div>
+        <div id="bgGradientCtl" class="ctl" hidden>
+          <div class="row">
+            <label>颜色 1</label>
+            <input type="color" id="bgGrad1" value="#ff9966">
+            <span class="hex" id="bgGrad1Hex">#ff9966</span>
+          </div>
+          <div class="row">
+            <label>颜色 2</label>
+            <input type="color" id="bgGrad2" value="#ff5e62">
+            <span class="hex" id="bgGrad2Hex">#ff5e62</span>
+          </div>
+          <div class="row">
+            <label>角度</label>
+            <input type="range" id="bgGradAngle" min="0" max="360" value="135">
+            <span class="val" id="bgGradAngleVal">135°</span>
+          </div>
+        </div>
+        <div id="bgImageCtl" class="ctl" hidden>
+          <p class="hint">点击下方图片设为壁纸背景</p>
+          <div id="bgImgPick" class="bg-pick"></div>
+          <button id="bgImgClear" class="btn link" hidden>清除背景图</button>
+        </div>
+      </section>
+
+      <section class="rp-section" id="propSection" hidden>
+        <h3>元素属性</h3>
+        <div id="textCtl" hidden>
+          <div class="row">
+            <textarea id="textContent" rows="3" placeholder="输入文字，支持多行换行"></textarea>
+          </div>
+          <div class="row">
+            <label>字体</label>
+            <select id="textFont" class="sel grow">
+              <option value="Microsoft YaHei">微软雅黑</option>
+              <option value="SimSun">宋体</option>
+              <option value="SimHei">黑体</option>
+              <option value="KaiTi">楷体</option>
+              <option value="Arial">Arial</option>
+              <option value="Georgia">Georgia</option>
+            </select>
+          </div>
+          <div class="row">
+            <label>颜色</label>
+            <input type="color" id="textColor" value="#ffffff">
+            <span class="hex" id="textColorHex">#ffffff</span>
+          </div>
+          <div class="row">
+            <label>对齐</label>
+            <div class="seg" id="textAlign">
+              <button data-align="left" class="active">左</button>
+              <button data-align="center">中</button>
+              <button data-align="right">右</button>
+            </div>
+          </div>
+          <div class="row">
+            <label>样式</label>
+            <label class="check"><input type="checkbox" id="textBold"> 粗体</label>
+            <label class="check"><input type="checkbox" id="textItalic"> 斜体</label>
+          </div>
+          <div class="row">
+            <label>行距</label>
+            <input type="range" id="textLineHeight" min="80" max="200" value="120">
+            <span class="val" id="textLineHeightVal">120%</span>
+          </div>
+        </div>
+        <div class="row">
+          <label id="propSizeLabel">大小</label>
+          <input type="range" id="propSize" min="20" max="800" value="200">
+          <span class="val" id="propSizeVal">200</span>
+        </div>
+        <div class="row">
+          <label>旋转</label>
+          <input type="range" id="propRot" min="0" max="360" value="0">
+          <span class="val" id="propRotVal">0°</span>
+        </div>
+        <div class="row">
+          <label>不透明度</label>
+          <input type="range" id="propOpacity" min="5" max="100" value="100">
+          <span class="val" id="propOpacityVal">100%</span>
+        </div>
+        <button id="propDelete" class="btn danger block">删除该元素</button>
+      </section>
+
+      <section class="rp-section" id="brushCtl" hidden>
+        <h3>笔刷设置</h3>
+        <div class="seg" id="brushType">
+          <button data-brush="pencil" class="active">铅笔</button>
+          <button data-brush="marker">马克笔</button>
+          <button data-brush="spray">喷枪</button>
+          <button data-brush="highlighter">荧光笔</button>
+        </div>
+        <div class="row" style="margin-top:8px">
+          <label>粗细</label>
+          <input type="range" id="brushSize" min="2" max="200" value="12">
+          <span class="val" id="brushSizeVal">12</span>
+        </div>
+        <div class="row">
+          <label>颜色</label>
+          <input type="color" id="brushColor" value="#ff5e62">
+          <span class="hex" id="brushColorHex">#ff5e62</span>
+        </div>
+        <div class="row">
+          <label>不透明度</label>
+          <input type="range" id="brushOpacity" min="5" max="100" value="80">
+          <span class="val" id="brushOpacityVal">80%</span>
+        </div>
+      </section>
+
+      <section class="rp-section grow">
+        <h3>图层 <span id="layerCount" class="count"></span></h3>
+        <div id="layerList" class="layer-list"></div>
+        <div id="layerEmpty" class="empty-tip" hidden>画布还是空的<br>点击左侧的 Emoji 或图片开始创作</div>
+      </section>
+    </aside>
+  </main>
+</div>
+
+<!-- ==================== 页面二：壁纸中心 ==================== -->
+<div class="page" id="pageWallpaper">
+  <div class="wp-scroll">
+    <section class="wp-section">
+      <div class="sec-head">
+        <h2>动态壁纸</h2>
+        <span class="hint">在桌面后台实时播放的动画壁纸，支持节能暂停</span>
+      </div>
+      <div id="dynCards" class="dyn-cards"></div>
+      <div id="dynNone" class="empty-tip" hidden>没有可用模板</div>
+    </section>
+
+    <section class="wp-section">
+      <div class="sec-head">
+        <h2>壁纸库 <span id="libCount" class="count"></span></h2>
+        <span class="hint">内置精选 + 本地导入，点击卡片即可设为桌面壁纸</span>
+      </div>
+      <div class="wp-toolbar">
+        <button id="genBtn" class="btn primary">✦ 生成精选壁纸</button>
+        <button id="importBtn" class="btn">＋ 导入图片</button>
+        <input type="file" id="wpFileInput" accept="image/png,image/jpeg,image/webp,image/gif,image/bmp" multiple hidden>
+        <button id="nextBtn" class="btn">⏭ 立即切换</button>
+        <button id="searchBtn" class="btn">🔍 以图搜图</button>
+        <span class="tb-sep"></span>
+        <label class="tb-label" for="wpMode">显示模式</label>
+        <select id="wpMode" class="sel">
+          <option value="fit">适应</option>
+          <option value="fill">填充</option>
+          <option value="center">居中</option>
+          <option value="stretch">拉伸</option>
+          <option value="span">跨屏拼接</option>
+        </select>
+      </div>
+      <div id="wpGrid" class="wp-grid"></div>
+      <div id="wpEmpty" class="empty-tip" hidden>
+        壁纸库还是空的<br>点击「生成精选壁纸」或「导入图片」开始
+      </div>
+    </section>
+  </div>
+</div>
+
+<!-- ==================== 页面三：设置 ==================== -->
+<div class="page" id="pageSettings">
+  <div class="st-scroll">
+    <section class="st-card">
+      <h2>定时切换壁纸</h2>
+      <div class="st-row">
+        <label class="switch-row"><input type="checkbox" id="schedEnabled"><span>启用定时切换</span></label>
+      </div>
+      <div class="st-row">
+        <label>切换间隔</label>
+        <input type="number" id="schedInterval" min="1" max="1440" step="1">
+        <span class="unit">分钟</span>
+      </div>
+      <div class="st-row">
+        <label>切换顺序</label>
+        <select id="schedOrder" class="sel">
+          <option value="random">随机</option>
+          <option value="sequence">按顺序轮换</option>
+        </select>
+      </div>
+      <div class="st-row">
+        <label>壁纸来源</label>
+        <select id="schedSource" class="sel">
+          <option value="builtin">仅内置精选</option>
+          <option value="user">仅用户导入</option>
+          <option value="all">全部壁纸</option>
+        </select>
+      </div>
+      <p class="tip">启用后到点自动轮换；壁纸库为空时会自动停用。</p>
+    </section>
+
+    <section class="st-card">
+      <h2>节能模式</h2>
+      <div class="st-row">
+        <label class="switch-row"><input type="checkbox" id="psFull"><span>全屏应用时暂停动态壁纸</span></label>
+      </div>
+      <div class="st-row">
+        <label class="switch-row"><input type="checkbox" id="psBattery"><span>电池供电时暂停动态壁纸</span></label>
+      </div>
+      <p class="tip">暂停仅停止动画渲染，动态壁纸仍保持桌面后台显示。</p>
+    </section>
+
+    <section class="st-card">
+      <h2>动态壁纸</h2>
+      <div class="st-row">
+        <label class="switch-row"><input type="checkbox" id="dynPerMonitor"><span>每个显示器独立窗口</span></label>
+      </div>
+      <div class="st-row">
+        <label class="switch-row"><input type="checkbox" id="dynClick"><span>点击穿透（不遮挡桌面操作）</span></label>
+      </div>
+      <p class="tip">关闭点击穿透后，动态壁纸窗口可接收鼠标事件（用于交互型壁纸）。</p>
+    </section>
+
+    <section class="st-card">
+      <h2>壁纸显示</h2>
+      <div class="st-row">
+        <label>默认显示模式</label>
+        <select id="defMode" class="sel">
+          <option value="fit">适应</option>
+          <option value="fill">填充</option>
+          <option value="center">居中</option>
+          <option value="stretch">拉伸</option>
+          <option value="span">跨屏拼接</option>
+        </select>
+      </div>
+      <div class="st-row">
+        <label>当前壁纸</label>
+        <span id="curWall" class="muted">无</span>
+      </div>
+      <div class="st-row">
+        <label>本地服务</label>
+        <span class="muted">http://127.0.0.1:8000</span>
+      </div>
+    </section>
+  </div>
+</div>
+
+<!-- ==================== 以图搜图弹窗 ==================== -->
+<div id="searchModal" class="modal" hidden>
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3>🔍 以图搜图</h3>
+      <button id="searchClose" class="modal-x">✕</button>
+    </div>
+    <p class="hint">上传一张图片，在本机壁纸库中检索相似的壁纸（本地感知哈希，无需联网）</p>
+    <div id="searchDrop" class="drop">点击选择或拖入图片</div>
+    <input type="file" id="searchFile" accept="image/*" hidden>
+    <div id="searchBusy" class="empty-tip" hidden>检索中…</div>
+    <div id="searchResults" class="search-results"></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="emoji_data.js"></script>
+<script src="editor-render.js"></script>
+<script src="app.js"></script>
+<script src="wallpaper.js"></script>
+</body>
+</html>

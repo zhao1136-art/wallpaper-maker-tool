@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>我的画布</title>
+<style>
+html,body{margin:0;height:100%;overflow:hidden;background:#0a0f1e}
+canvas{display:block}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script src="/editor-render.js"></script>
+<script>
+(function () {
+  "use strict";
+  var paused = false;
+  window.__wmSetPaused = function (p) { paused = !!p; };
+
+  var cv = document.getElementById("c");
+  var ctx = cv.getContext("2d");
+  var comp = null;
+  var W = 1920, H = 1080, scale = 1;
+  var t0 = performance.now();
+  var raf = 0;
+
+  function loadImage(src) {
+    return new Promise(function (res, rej) {
+      var im = new Image();
+      im.onload = function () { res(im); };
+      im.onerror = rej;
+      im.src = src;
+    });
+  }
+
+  function setupCanvas() {
+    scale = Math.min(1, innerWidth / W, innerHeight / H);
+    cv.width = Math.max(1, Math.round(W * scale));
+    cv.height = Math.max(1, Math.round(H * scale));
+  }
+  addEventListener("resize", setupCanvas);
+  setupCanvas();
+
+  function loadComposition() {
+    return fetch("/api/dynamic/composition")
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        comp = d && d.comp ? d.comp : null;
+        if (!comp) return;
+        W = comp.baseW || 1920;
+        H = comp.baseH || 1080;
+        setupCanvas();
+        var jobs = [];
+        if (comp.bg && comp.bg.type === "image" && comp.bg.imageId) {
+          jobs.push(loadImage("/api/image/" + comp.bg.imageId)
+            .then(function (im) { comp.bg._img = im; }).catch(function () {}));
+        }
+        (comp.elements || []).forEach(function (el) {
+          if (el.kind === "image" && el.assetId) {
+            jobs.push(loadImage("/api/image/" + el.assetId)
+              .then(function (im) { el._img = im; }).catch(function () {}));
+          }
+        });
+        return Promise.all(jobs);
+      }).catch(function () { comp = null; });
+  }
+
+  function animFor(el, t) {
+    var anim = { alpha: 1 };
+    var seed = window.wm.wmHash(el.id || "");
+    if (el.kind === "text" || el.kind === "emoji") {
+      anim.glow = 14 + 8 * Math.sin(t * 1.2 + seed);
+      anim.dx = 3 * Math.sin(t * 0.9 + (seed % 6));
+      anim.dy = 4 * Math.sin(t * 0.7 + (seed % 11));
+    } else if (el.kind === "image") {
+      anim.dy = 2 * Math.sin(t * 0.5 + (seed % 9));
+    }
+    return anim;
+  }
+
+  function render(t) {
+    var time = (t - t0) / 1000;
+    ctx.setTransform(scale, 0, 0, scale, 0, 0);
+    window.wm.wmPaintBackground(ctx, comp.bg, W, H);
+    (comp.elements || []).forEach(function (el) {
+      window.wm.wmDrawElement(ctx, el, paused ? null : animFor(el, time));
+    });
+  }
+
+  function loop(t) {
+    if (comp) render(t);
+    raf = requestAnimationFrame(loop);
+  }
+
+  loadComposition().then(function () {
+    cancelAnimationFrame(raf);
+    raf = requestAnimationFrame(loop);
+  });
+})();
+</script>
+</body>
+</html>

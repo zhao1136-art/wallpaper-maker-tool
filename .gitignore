@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# 运行生成物 / 用户数据
+wallpapers/.thumbs/
+wallpapers/builtin/
+wallpapers/user/
+wallpapers/dyn/custom.json
+assets/images/
+assets/thumbs/
+assets/exports/
+assets/wallpaper_cache/
+library.json
+config.json
+dyn_debug*.log
+
+# 本地素材（示例/分享壁纸）
+*.jpg
+
+# 编辑器/系统
+.vscode/
+.idea/
+*.swp

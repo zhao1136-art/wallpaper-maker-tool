@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>星空</title>
+<style>html,body{margin:0;height:100%;overflow:hidden;background:#04060f}canvas{display:block}</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+var paused=false;window.__wmSetPaused=function(p){paused=p};
+var cv=document.getElementById('c'),ctx=cv.getContext('2d');
+function resize(){cv.width=innerWidth*devicePixelRatio;cv.height=innerHeight*devicePixelRatio;ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0)}
+addEventListener('resize',resize);resize();
+var W=function(){return innerWidth},H=function(){return innerHeight};
+var stars=[],shoot=[],t0=performance.now();
+function makeStar(deep){return{x:Math.random()*W(),y:deep?Math.random()*H():Math.random()*H()*0.8,r:Math.random()*1.5+0.3,tw:0.3+Math.random()*0.9}}
+for(var i=0;i<520;i++)stars.push(makeStar(true));
+function draw(){
+  var w=W(),h=H(),t=(performance.now()-t0)/1000;
+  var g=ctx.createLinearGradient(0,0,0,h);
+  g.addColorStop(0,'#030512');g.addColorStop(0.55,'#070b1e');g.addColorStop(1,'#0c1024');
+  ctx.fillStyle=g;ctx.fillRect(0,0,w,h);
+  for(var i=0;i<stars.length;i++){
+    var s=stars[i],a=0.45+0.55*Math.abs(Math.sin(t*s.tw*2+s.x));
+    ctx.globalAlpha=a*0.9;ctx.fillStyle='#eef3ff';ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,6.283);ctx.fill();
+  }
+  ctx.globalAlpha=1;
+  var gy=ctx.createLinearGradient(0,h*0.18,0,h*0.46);
+  gy.addColorStop(0,'rgba(150,170,255,0.10)');gy.addColorStop(1,'rgba(150,170,255,0)');
+  ctx.fillStyle=gy;ctx.fillRect(0,h*0.12,w,h*0.36);
+  if(Math.random()<0.02&&shoot.length<3)shoot.push({x:Math.random()*w*0.9,y:Math.random()*h*0.3,vx:8+Math.random()*6,vy:3+Math.random()*3,life:1});
+  for(var k=shoot.length-1;k>=0;k--){
+    var s=shoot[k];s.x+=s.vx;s.y+=s.vy;s.life-=0.025;
+    var gr=ctx.createLinearGradient(s.x,s.y,s.x-s.vx*9,s.y-s.vy*9);
+    gr.addColorStop(0,'rgba(220,235,255,'+s.life+')');gr.addColorStop(1,'rgba(220,235,255,0)');
+    ctx.strokeStyle=gr;ctx.lineWidth=1.6;
+    ctx.beginPath();ctx.moveTo(s.x,s.y);ctx.lineTo(s.x-s.vx*9,s.y-s.vy*9);ctx.stroke();
+    if(s.life<=0)shoot.splice(k,1);
+  }
+}
+var last=0;
+function loop(now){if(now-last>33){last=now;if(!paused)draw()}requestAnimationFrame(loop)}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
