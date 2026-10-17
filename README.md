@@ -217,3 +217,15 @@ pyinstaller wallpaper.spec
 - 本项目仅用于个人学习与交流，请勿用于商业用途
 - 内置 Emoji 数据版权归 Unicode 联盟及其各供应商所有
 - 使用本项目造成的任何系统壁纸设置变更与用户自行承担相关风险
+
+---
+
+## 同作者的其它项目
+
+| 项目 | 说明 |
+|---|---|
+| [**antivirus-software**](https://github.com/zhao1136-art/antivirus-software) | 御天 Windows 安全防护套件：YARA 规则 + 9 个 ETW provider + C++ 原生层 + 沙箱 + 跨引擎确认 |
+| [**yutian-guardian-ai**](https://github.com/zhao1136-art/yutian-guardian-ai) | 二进制转灰度图 + 轻量 CNN + OOD 四态融合判定的 AI 检测分支 |
+| [**memory-optimizer**](https://github.com/zhao1136-art/memory-optimizer) | 纯 C 写的 Windows 内存分析工具（采样 / 泄漏识别 / 碎片 / 热点 / PDF 报告） |
+| [**poetry-duel-platform**](https://github.com/zhao1136-art/poetry-duel-platform) | AI 自动对诗平台：对联 / 接龙 / 唱和 / 飞花令，三通道自动降级 |
+| [**SleepPostponeTool**](https://github.com/zhao1136-art/SleepPostponeTool) | 电脑休眠推迟工具（SetThreadExecutionState，零依赖单文件 exe） |
