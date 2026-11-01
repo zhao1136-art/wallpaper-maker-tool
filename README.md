@@ -1,18 +1,20 @@
+<div align="center">
+
 # 壁纸工坊 WallpaperMaker
 
-<p align="center">
-  <img src="docs/hero.jpg" width="100%" alt="壁纸工坊 - 桌面壁纸制作与管理系统">
-</p>
+**一款基于 Python + pywebview + Canvas 的 Windows 桌面壁纸制作与管理系统 —— 内置 1045 个 Emoji 素材库，支持画布创作、壁纸中心、动态壁纸引擎、定时切换与以图搜图。**
 
-<p align="center">
-  <a href="#功能特性"><img src="https://img.shields.io/badge/功能-编辑器%20·%20壁纸中心%20·%20设置-blueviolet"></a>
-  <a href="#使用示例"><img src="https://img.shields.io/badge/平台-Windows%2010%2F11-0078D6"></a>
-  <a href="#快速开始"><img src="https://img.shields.io/badge/Python-3.10%2B-3776AB"></a>
-  <a href="#快速开始"><img src="https://img.shields.io/badge/渲染-WebView2-4B8BF5"></a>
-  <a href="#快速开始"><img src="https://img.shields.io/badge/依赖-pywebview%20%2B%20Pillow-2ea44f"></a>
-</p>
+<img src="docs/hero.jpg" width="100%" alt="壁纸工坊 - 桌面壁纸制作与管理系统">
 
-一款基于 **Python + pywebview + Canvas** 的 Windows 桌面壁纸制作与管理系统。内置 1045 个 Emoji 素材库，支持画布创作、壁纸中心、动态壁纸引擎、定时切换与以图搜图，界面运行在软件内置浏览器（WebView2）中。
+<a href="#功能特性"><img src="https://img.shields.io/badge/%E5%8A%9F%E8%83%BD-%E7%BC%96%E8%BE%91%E5%99%A8%20%C2%B7%20%E5%A3%81%E7%BA%B8%E4%B8%AD%E5%BF%83%20%C2%B7%20%E8%AE%BE%E7%BD%AE-blueviolet"></a>
+<a href="#快速开始"><img src="https://img.shields.io/badge/%E5%B9%B3%E5%8F%B0-Windows%2010%2F11-0078D6"></a>
+<a href="#快速开始"><img src="https://img.shields.io/badge/Python-3.10%2B-3776AB"></a>
+<a href="#快速开始"><img src="https://img.shields.io/badge/%E6%B8%B2%E6%9F%93-WebView2-4B8BF5"></a>
+<a href="LICENSE"><img src="https://img.shields.io/badge/license-%E7%A6%81%E6%AD%A2%E5%95%86%E7%94%A8-EA6A00"></a>
+
+</div>
+
+---
 
 > 本项目为个人学习交流项目，仅支持 Windows 10 / 11。
 
@@ -244,3 +246,9 @@ pyinstaller wallpaper.spec
 
 
 > 本项目为个人项目，按「现状」提供，不附带任何担保。
+
+---
+
+<div align="center">
+<sub>个人项目 · <a href="LICENSE">PolyForm Noncommercial License 1.0.0</a> · 禁止商业使用</sub>
+</div>
