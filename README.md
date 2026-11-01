@@ -229,3 +229,18 @@ pyinstaller wallpaper.spec
 | [**memory-optimizer**](https://github.com/zhao1136-art/memory-optimizer) | 纯 C 写的 Windows 内存分析工具（采样 / 泄漏识别 / 碎片 / 热点 / PDF 报告） |
 | [**poetry-duel-platform**](https://github.com/zhao1136-art/poetry-duel-platform) | AI 自动对诗平台：对联 / 接龙 / 唱和 / 飞花令，三通道自动降级 |
 | [**SleepPostponeTool**](https://github.com/zhao1136-art/SleepPostponeTool) | 电脑休眠推迟工具（SetThreadExecutionState，零依赖单文件 exe） |
+
+## 许可
+
+**禁止商业使用。**
+
+本项目采用 [PolyForm Noncommercial License 1.0.0](LICENSE)。
+
+- **允许**：个人学习、研究、实验、业余项目；教学、公益、公共研究、政府部门等非商业组织使用。
+- **不允许**：任何商业用途 —— 包括但不限于集成进商业产品、做成 SaaS 或收费服务、
+  为企业内部商业运营提供支持。
+
+本仓库包含的第三方资源保留原有许可：JetBrains Mono 字体（SIL Open Font License 1.1）、mermaid.min.js（MIT）。
+
+
+> 本项目为个人项目，按「现状」提供，不附带任何担保。
